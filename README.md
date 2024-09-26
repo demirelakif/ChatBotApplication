@@ -5,8 +5,8 @@ To get this project running locally , in the server/ directory, create a file na
 PORT = 5000
 DATABASE_URL = <Your_MongoDB_Connection_String
 SECRET = <Your_Secret_Key>
-Replace <Your_MongoDB_Connection_String> and <Your_Secret_Key> with your own credentials.
 ```
+Replace <Your_MongoDB_Connection_String> and <Your_Secret_Key> with your own credentials.
 ---
 Screenshot
 ---
