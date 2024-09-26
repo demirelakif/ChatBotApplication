@@ -4,9 +4,8 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-const Session = require('./models/Session');
+
 require('dotenv').config();
-const Questions = require('./constants/Questions');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -24,7 +23,7 @@ mongoose.connect(process.env.DATABASE_URL, {})
 .catch(err => console.error('MongoDB Connection Error:', err));
 
 app.use(session({
-  secret: 'akomastika',
+  secret: process.env.SECRET,
   resave: false,
   cookie:{
     httpOnly:true,

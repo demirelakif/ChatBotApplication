@@ -10,33 +10,45 @@ import Cookies from 'js-cookie';
 
 const Chatbot = () => {
     const [messages, setMessages] = useState([]);
-    const [botCurrentMessage, setBotCurrentMessage] = useState('');
     const [inputMessage, setInputMessage] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const endOfMessagesRef = useRef(null);
 
-    const handleSendMessage = () => {
+    const handleSendMessage = async() => {
+        //if input message is empty
         if (inputMessage.trim() === '') return;
+        //add user's message to messages array
         const newMessage = { sender: 'user', text: inputMessage };
         setMessages([...messages, newMessage]);
+        //set input message default
         setInputMessage('');
+        //scroll down
         endOfMessagesRef.current.scrollIntoView({ behavior: 'smooth'});
+        //bot thinking
         setIsTyping(true);
-        console.log(messages)
-        setTimeout(() => {
-            const botReply = { sender: 'bot', text: botCurrentMessage };
-            setMessages((prevMessages) => [...prevMessages, botReply]);
-            setIsTyping(false);
-            AnswerQuestion(inputMessage);
+        //send answer to api and get next question
+        const nextQuestion = await AnswerQuestion(inputMessage);
+        
+        if(nextQuestion){
+            setTimeout(() => {
+                console.log(nextQuestion)
+                //set bots new message
+                const botReply = { sender: 'bot', text: nextQuestion };
+                setMessages((prevMessages) => [...prevMessages, botReply]);
+                //bot thinking stopped
+                setIsTyping(false);
+            }, 1000);
+        }
 
-        }, 1000);
     };
 
     const StartSession = async () => {
+        //think started
         setIsTyping(true);
         await axios.post('http://localhost:5000/api/sessions', {}, { withCredentials: true })
             .then((response) => {
                 console.log(response.data);
+                //set cookies
                 Cookies.set('sessionId', response.data.sessionId);
                 
             })
@@ -44,15 +56,17 @@ const Chatbot = () => {
                 console.error(err);
             });
 
+        //bring first question
         await CheckQuestion()
+        //think finished
         setIsTyping(false);
     };
 
     const CheckQuestion = async () => {
         await axios.get('http://localhost:5000/api/sessions/question', { withCredentials: true })
             .then((response) => {
-                setBotCurrentMessage(response.data.question);
                 console.log(response.data.question)
+                //set current question
                 const newMessage = { sender: 'bot', text: response.data.question };
                 console.log(newMessage);
                 setMessages(prevMessages => [...prevMessages, newMessage]);
@@ -63,14 +77,26 @@ const Chatbot = () => {
     };
 
     const AnswerQuestion = async (inputMessage) => {
-        await axios.post('http://localhost:5000/api/sessions/answer', {"answer":inputMessage}, { withCredentials: true })
-            .then((response) => {
-                console.log(response.data);
-                setBotCurrentMessage(response.data.question);
-            })
-            .catch((err) => {
-                console.error(err);
-            });
+        try {
+            const response = await axios.post('http://localhost:5000/api/sessions/answer', { "answer": inputMessage }, { withCredentials: true });
+            console.log(response.data);
+            //if questions are completed successfully
+            if (response.data.sessionEnded) {
+                console.log('Session has ended...');
+                //remove the cookies
+                Cookies.remove('sessionId');
+                //set bots last message
+                const newMessage = { sender: 'bot', text: "You answered all questions!" };
+                setMessages(prevMessages => [...prevMessages, newMessage]);
+                const lastMessage = { sender: 'bot', text: "Welcome to Bolt Insight" };
+                setMessages(prevMessages => [...prevMessages, lastMessage]);
+                setIsTyping(false);
+                
+            }
+            return response.data.question; 
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     const getChatHistory = async () => {
@@ -78,17 +104,22 @@ const Chatbot = () => {
             .then((response) => {
                 console.log(response.data[0].responses);
                 if(response.data[0].responses.length>0){
+                    //set messages saved before
                     response.data[0].responses.forEach(el => {
-                        let newMessageUser = { sender: 'user', text: el.user };
-                        setMessages((prevMessages) => [...prevMessages, newMessageUser]);
                         let newMessageBot = { sender: 'bot', text: el.bot };
                         setMessages((prevMessages) => [...prevMessages, newMessageBot]);
-                    });
+                        let newMessageUser = { sender: 'user', text: el.user };
+                        setMessages((prevMessages) => [...prevMessages, newMessageUser]);
+                    }); 
                 }
+                //bring new question
+                CheckQuestion();
                 
             })
             .catch((err) => {
                 console.error(err);
+                //for if responses is not saved on mongo
+                CheckQuestion();
             });
     };
 
@@ -100,7 +131,6 @@ const Chatbot = () => {
 
         }else{
             getChatHistory();
-            CheckQuestion();
         }
 
 
@@ -117,7 +147,7 @@ const Chatbot = () => {
         if (endOfMessagesRef.current) {
             endOfMessagesRef.current.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [messages]); // messages state'i değiştiğinde tetiklenir
+    }, [messages]); // on message state changed
 
     return (
         <Box sx={{ width: "25vw", margin: '50px auto', border: '3px solid #9e9e9e', borderRadius: 2 }}>
@@ -180,7 +210,7 @@ const Chatbot = () => {
                 <TextField
                     value={inputMessage}
                     onChange={(e) => setInputMessage(e.target.value)}
-                    placeholder="Mesajınızı yazın..."
+                    placeholder="Type a message..."
                     onKeyDown={handleKeyDown}
                     fullWidth
                     style={{ backgroundColor: "#024082", border: "1px solid", borderRadius: "32px", borderColor: "white" }}
