@@ -1,4 +1,3 @@
-Chatbot Application
 This project is a chatbot application powered by Node.js, Express, and MongoDB.
 To get this project running locally , in the server/ directory, create a file named .env with the following content:
 ```
